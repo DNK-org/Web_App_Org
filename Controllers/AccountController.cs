@@ -16,13 +16,15 @@ namespace Azure_API_Test.Controllers
     [ApiController]
     public class AccountController : ControllerBase
     {
-        private readonly Token_Generator _tg;
 
+
+        private readonly Token_Generator _tg;
 
         public AccountController(Token_Generator tg)
         {
-        _tg = tg;
+            _tg = tg;
         }
+
 
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginRequest login)
