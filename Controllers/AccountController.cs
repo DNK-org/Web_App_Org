@@ -1,10 +1,13 @@
-﻿using Microsoft.AspNetCore.Cors;
+﻿using Azure_API_Test.Tokens;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
+using static Azure_API_Test.Request.Request;
 
 namespace Azure_API_Test.Controllers
 {
@@ -13,11 +16,12 @@ namespace Azure_API_Test.Controllers
     [ApiController]
     public class AccountController : ControllerBase
     {
-        private readonly IConfiguration _config;
+        private readonly Token_Generator _tg;
 
-        public AccountController(IConfiguration config)
+
+        public AccountController(Token_Generator tg)
         {
-            _config = config;
+        _tg = tg;
         }
 
         [HttpPost("login")]
@@ -25,37 +29,45 @@ namespace Azure_API_Test.Controllers
         {
             if (login.Username == "admin" && login.Password == "password") // dummy validation
             {
-                var token = GenerateToken(login.Username);
-                return Ok(new { token });
+                var token = _tg.GenerateToken(login.Username);
+                var refreshToken = _tg.GenerateRefreshToken(); // New refresh token
+
+                // Ideally, store this refresh token in database against the user for validation later
+                // For demo, you can return it directly
+
+                return Ok(new
+                {
+                    token,
+                    refreshToken
+                });
             }
+
+
+
             return Unauthorized();
         }
-
-        private string GenerateToken(string username)
+        [HttpPost("refresh-token")]
+        public IActionResult RefreshToken([FromBody] RefreshTokenRequest refreshRequest)
         {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
-            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+            // Ideally, validate the refresh token from the database
 
-            var claims = new[]
+            // For demo: Always assume refreshToken is valid
+
+            if (refreshRequest.RefreshToken == null)
             {
-                new Claim(ClaimTypes.Name, username)
-            };
+                return BadRequest("Invalid refresh token");
+            }
 
-            var token = new JwtSecurityToken(
-                _config["Jwt:Issuer"],
-                _config["Jwt:Issuer"],
-                claims,
-                expires: DateTime.Now.AddMinutes(1),
-                signingCredentials: credentials);
+            var newAccessToken = _tg.GenerateToken("admin"); // Normally, retrieve username from DB
+            var newRefreshToken = _tg.GenerateRefreshToken(); // Generate new refresh token also if you want to rotate
 
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            return Ok(new
+            {
+                accessToken = newAccessToken,
+                refreshToken = newRefreshToken
+            });
         }
-    }
 
-    public class LoginRequest
-    {
-        public string Username { get; set; }
-        public string Password { get; set; }
     }
 }
 
